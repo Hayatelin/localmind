@@ -1,5 +1,7 @@
 # LocalMind
 
+<p align="center"><img src="docs/demo.svg" alt="LocalMind demo" width="760"></p>
+
 **A privacy-first, local AI assistant gateway. All your data stays on your machine.**
 
 LocalMind is a small, dependency-light Python assistant that routes what you type
