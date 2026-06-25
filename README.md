@@ -13,7 +13,7 @@
   <a href="https://github.com/Hayatelin/localmind/stargazers"><img src="https://img.shields.io/github/stars/Hayatelin/localmind?style=social" alt="stars"></a>
 </p>
 
-<p align="center"><img src="docs/demo.svg" alt="LocalMind demo" width="760"></p>
+<p align="center"><img src="docs/demo.gif" alt="LocalMind demo" width="820"></p>
 
 ---
 
