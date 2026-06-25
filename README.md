@@ -1,8 +1,21 @@
-# LocalMind
+<h1 align="center">🏠 LocalMind</h1>
+
+<p align="center">
+  <b>A private AI assistant that runs entirely on your machine.</b><br>
+  Plug-in skills (notes, reminders, file search, calc), SQLite memory, and an offline mock model — or point it at Ollama / LM Studio.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Hayatelin/localmind/releases"><img src="https://img.shields.io/github/v/release/Hayatelin/localmind?color=4f46e5" alt="release"></a>
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
+  <img src="https://img.shields.io/badge/privacy-local--first-0fb9a4" alt="privacy">
+  <img src="https://img.shields.io/badge/license-MIT-yellow" alt="license">
+  <a href="https://github.com/Hayatelin/localmind/stargazers"><img src="https://img.shields.io/github/stars/Hayatelin/localmind?style=social" alt="stars"></a>
+</p>
 
 <p align="center"><img src="docs/demo.svg" alt="LocalMind demo" width="760"></p>
 
-**A privacy-first, local AI assistant gateway. All your data stays on your machine.**
+---
 
 LocalMind is a small, dependency-light Python assistant that routes what you type
 to drop-in **skills** (notes, reminders, file search, calculator, ...) and only
