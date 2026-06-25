@@ -6,6 +6,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Hayatelin/localmind/actions/workflows/ci.yml"><img src="https://github.com/Hayatelin/localmind/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Hayatelin/localmind/releases"><img src="https://img.shields.io/github/v/release/Hayatelin/localmind?color=4f46e5" alt="release"></a>
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python">
   <img src="https://img.shields.io/badge/privacy-local--first-0fb9a4" alt="privacy">
