@@ -63,6 +63,9 @@ class Assistant:
     def handle(self, query: str, record_history: bool = True) -> RouteResult:
         """Route ``query`` and return the reply plus which skill (if any) ran."""
         query = query.strip()
+        # Snapshot earlier turns *before* storing this one, so the provider
+        # receives the current message exactly once (as ``prompt``).
+        history = self._recent_provider_history()
         if record_history:
             self.storage.add_history("user", query)
 
@@ -71,7 +74,6 @@ class Assistant:
             reply = skill.run(query, self._context)
             used = skill.name
         else:
-            history = self._recent_provider_history()
             reply = self.provider.generate(query, history=history)
             used = None
 

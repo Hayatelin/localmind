@@ -55,3 +55,31 @@ def test_history_is_recorded(config: Config):
     roles = [h["role"] for h in history]
     assert "user" in roles and "assistant" in roles
     bot.close()
+
+
+class _RecordingProvider:
+    """Provider stub that records exactly what the Assistant passes in."""
+
+    name = "recording"
+
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, prompt, history=None):
+        self.calls.append((prompt, list(history or [])))
+        return "ok"
+
+
+def test_provider_history_excludes_current_message(config: Config):
+    provider = _RecordingProvider()
+    bot = Assistant(config=config, storage=Storage(config.db_path), provider=provider)
+    bot.handle("calc 1 + 1")          # skill turn, stored in history
+    bot.handle("tell me a joke")      # no skill -> provider fallback
+    prompt, history = provider.calls[-1]
+    assert prompt == "tell me a joke"
+    # Only earlier turns: the current message is sent once, as ``prompt``.
+    assert history == [
+        {"role": "user", "content": "calc 1 + 1"},
+        {"role": "assistant", "content": "1 + 1 = 2"},
+    ]
+    bot.close()
