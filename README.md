@@ -73,7 +73,7 @@ python -m localmind            # 進入互動式對話
 Requires **Python 3.9+**.
 
 ```bash
-git clone https://github.com/VictorLin/localmind.git
+git clone https://github.com/Hayatelin/localmind.git
 cd localmind
 
 # Recommended: a virtual environment
