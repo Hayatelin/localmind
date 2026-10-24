@@ -35,8 +35,8 @@ dev = ["pytest>=7.0"]
 localmind = "localmind.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/VictorLin/localmind"
-Repository = "https://github.com/VictorLin/localmind"
+Homepage = "https://github.com/Hayatelin/localmind"
+Repository = "https://github.com/Hayatelin/localmind"
 
 [tool.setuptools.packages.find]
 include = ["localmind*"]
