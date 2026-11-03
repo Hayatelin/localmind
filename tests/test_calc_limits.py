@@ -6,12 +6,29 @@ power runs inside C code and cannot be interrupted by signals or threads.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from localmind.skills import SkillContext, calc
+
+# Repo root, so child interpreters can import localmind even when it is not
+# pip-installed (CI runs ``pytest`` straight from the checkout).
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+
+
+def _isolate(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOCALMIND_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("LOCALMIND_FILE_SEARCH_DIR", str(tmp_path / "files"))
+    monkeypatch.setenv("LOCALMIND_DB", str(tmp_path / "lm.db"))
+    existing = os.environ.get("PYTHONPATH")
+    monkeypatch.setenv(
+        "PYTHONPATH", _REPO_ROOT + (os.pathsep + existing if existing else "")
+    )
+
 
 # Times calc.run inside a fresh interpreter and prints "<seconds>\n<reply>".
 _TIMED_RUN = """
@@ -25,9 +42,7 @@ print(reply)
 
 
 def _timed_calc(query: str, tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALMIND_HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("LOCALMIND_FILE_SEARCH_DIR", str(tmp_path / "files"))
-    monkeypatch.setenv("LOCALMIND_DB", str(tmp_path / "lm.db"))
+    _isolate(tmp_path, monkeypatch)
     proc = subprocess.run(
         [sys.executable, "-c", _TIMED_RUN, query],
         capture_output=True,
@@ -48,9 +63,7 @@ def test_huge_power_returns_error_quickly(query, tmp_path, monkeypatch):
 
 
 def test_huge_power_via_cli_does_not_hang(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALMIND_HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("LOCALMIND_FILE_SEARCH_DIR", str(tmp_path / "files"))
-    monkeypatch.setenv("LOCALMIND_DB", str(tmp_path / "lm.db"))
+    _isolate(tmp_path, monkeypatch)
     proc = subprocess.run(
         [sys.executable, "-m", "localmind", "--once", "calc 9 ** 9 ** 9"],
         capture_output=True,
