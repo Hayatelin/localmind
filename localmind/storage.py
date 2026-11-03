@@ -5,8 +5,8 @@ a single SQLite database file on the user's machine. There is no server and no
 network access; this module is a thin, well-typed wrapper around the standard
 library :mod:`sqlite3`.
 
-The :class:`Storage` class owns one connection and creates its schema lazily on
-first use, so callers can simply do::
+The :class:`Storage` class owns one connection, which it opens (creating the
+database file and its schema) only on first use, so callers can simply do::
 
     store = Storage(path)
     store.add_note("buy milk")
@@ -34,11 +34,21 @@ class Storage:
         parent = Path(self.db_path).parent
         if str(parent):
             parent.mkdir(parents=True, exist_ok=True)
-        # ``check_same_thread=False`` keeps the simple CLI usable from tests;
-        # LocalMind never shares a connection across threads concurrently.
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        self._create_schema()
+        # The connection (and so the database file) is created on first
+        # access to ``conn``; commands such as ``config`` never touch it.
+        self._conn: Optional[sqlite3.Connection] = None
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        """The SQLite connection, opened and initialised on first access."""
+        if self._conn is None:
+            # ``check_same_thread=False`` keeps the simple CLI usable from tests;
+            # LocalMind never shares a connection across threads concurrently.
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            self._conn = conn
+            self._create_schema()
+        return self._conn
 
     # -- lifecycle ---------------------------------------------------------
     def _create_schema(self) -> None:
@@ -71,8 +81,10 @@ class Storage:
         self.conn.commit()
 
     def close(self) -> None:
-        """Close the underlying connection."""
-        self.conn.close()
+        """Close the connection, if one was opened. Safe to call repeatedly."""
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
 
     # -- context manager support ------------------------------------------
     def __enter__(self) -> "Storage":
