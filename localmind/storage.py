@@ -52,15 +52,24 @@ class Storage:
                     # from tests; LocalMind never shares a connection across
                     # threads concurrently.
                     conn = sqlite3.connect(self.db_path, check_same_thread=False)
-                    conn.row_factory = sqlite3.Row
+                    try:
+                        conn.row_factory = sqlite3.Row
+                        self._create_schema(conn)
+                    except BaseException:
+                        # Never keep a half-initialised connection: close it,
+                        # leave ``_conn`` as None and re-raise unchanged, so
+                        # the next access tries (and fails) again.
+                        conn.close()
+                        raise
+                    # Publish only a fully initialised connection.
                     self._conn = conn
-                    self._create_schema()
         return self._conn
 
     # -- lifecycle ---------------------------------------------------------
-    def _create_schema(self) -> None:
-        """Create all tables if they do not yet exist (idempotent)."""
-        self.conn.executescript(
+    @staticmethod
+    def _create_schema(conn: sqlite3.Connection) -> None:
+        """Create all tables on ``conn`` if they do not yet exist (idempotent)."""
+        conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS notes (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +94,7 @@ class Storage:
             );
             """
         )
-        self.conn.commit()
+        conn.commit()
 
     def close(self) -> None:
         """Close the connection, if one was opened. Safe to call repeatedly."""

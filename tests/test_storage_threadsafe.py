@@ -75,3 +75,32 @@ def test_single_thread_api_unchanged(tmp_path: Path):
     store.close()
     store.close()
 
+
+def test_not_a_database_raises_every_time(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("LOCALMIND_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("LOCALMIND_DB", raising=False)
+    db = tmp_path / "bad.db"
+    db.write_text("not a database", encoding="utf-8")
+    store = Storage(str(db))
+
+    with pytest.raises(sqlite3.DatabaseError):
+        store.conn
+    assert store._conn is None
+
+    with pytest.raises(sqlite3.DatabaseError):
+        store.conn
+    assert store._conn is None
+
+    store.close()  # nothing open; must not raise
+    assert db.read_text(encoding="utf-8") == "not a database"
+
+
+def test_schema_exists_after_first_access(tmp_path: Path):
+    store = Storage(str(tmp_path / "lm.db"))
+    conn = store.conn
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    assert {"notes", "reminders", "history"} <= tables
+    store.close()
