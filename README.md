@@ -264,7 +264,9 @@ in a single pass.
 2. `--once TEXT`, or each REPL line, calls `Assistant.handle(text)`, which reads the
    10 most recent rows of the SQLite `history` table, then saves the user message.
 3. `best_skill` asks every skill for `score(query)`: +1.0 per keyword found as a
-   whole word, +0.5 more if the message starts with it. The top score wins if it is
+   whole word, +0.5 more if the message starts with it. The notes skill adds +2.0
+   when the message is `find`/`search` + `note`/`notes` + a search term, so that
+   `find notes milk` searches notes rather than file names. The top score wins if it is
    at least `MATCH_THRESHOLD` (1.0); on a tie, the skill loaded first wins.
 4. If a skill wins, `skill.run(query, context)` returns the reply. Skills parse the
    text with regular expressions and use SQLite or the filesystem; no model is involved.

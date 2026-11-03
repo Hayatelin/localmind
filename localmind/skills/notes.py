@@ -6,6 +6,7 @@ Examples that route here::
     note: call the dentist
     list notes
     search notes milk
+    find notes milk
 """
 
 from __future__ import annotations
@@ -13,6 +14,16 @@ from __future__ import annotations
 import re
 
 from . import Skill, SkillContext
+
+#: "search note(s)" / "find note(s)" as whole words, e.g. not "find notebook".
+_SEARCH_PREFIX = re.compile(r"^\s*(?:search|find)\s+notes?(?=\s|$)", re.I)
+#: The same prefix followed by a search term. Used for routing, so that
+#: "find notes milk" goes to this skill while "find notes.txt" or
+#: "find notebook" stays with file_search.
+_SEARCH_WITH_TERM = re.compile(r"^\s*(?:search|find)\s+notes?\s+\S", re.I)
+#: Extra routing score for a notes search. file_search scores a leading
+#: "find" at 1.5, so without this "find notes milk" would go to file_search.
+_SEARCH_BONUS = 2.0
 
 
 def _strip_prefix(query: str) -> str:
@@ -29,7 +40,7 @@ def run(query: str, context: SkillContext) -> str:
     lowered = text.lower()
 
     # --- search ---------------------------------------------------------
-    if lowered.startswith(("search note", "find note", "search notes")):
+    if _SEARCH_PREFIX.match(text):
         term = re.sub(r"^\s*(search|find)\s+notes?\s*", "", text, flags=re.I).strip()
         if not term:
             return "What should I search your notes for? e.g. 'search notes milk'."
@@ -59,9 +70,24 @@ def run(query: str, context: SkillContext) -> str:
     return f"Saved note #{note_id}: {body}"
 
 
+_KEYWORDS = ["note", "notes"]
+_DESCRIPTION = "Add, list and search personal notes stored in local SQLite."
+# Plain keyword scorer, reused by ``_score`` below.
+_KEYWORD_SKILL = Skill(name="notes", keywords=_KEYWORDS, run=run)
+
+
+def _score(query: str) -> float:
+    """Keyword score, plus a bonus for 'find/search note(s) <term>'."""
+    score = _KEYWORD_SKILL.score(query)
+    if _SEARCH_WITH_TERM.match(query):
+        score += _SEARCH_BONUS
+    return score
+
+
 SKILL = Skill(
     name="notes",
-    keywords=["note", "notes"],
+    keywords=_KEYWORDS,
     run=run,
-    description="Add, list and search personal notes stored in local SQLite.",
+    description=_DESCRIPTION,
+    _scorer=_score,
 )

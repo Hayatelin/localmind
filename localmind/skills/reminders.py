@@ -6,7 +6,12 @@ Examples that route here::
     reminder: submit taxes by friday
     list reminders
 
-Due times are stored as free-form text (whatever follows ``at``/``by``/``on``).
+A due time is recognised only when the message *ends* with ``at``/``by``/
+``on``/``due`` followed by one of these forms: a 12-hour time (``5pm``,
+``10:30 am``), a 24-hour ``HH:MM`` time, a ``YYYY-MM-DD`` date, a weekday name
+or three-letter abbreviation, or ``today``/``tomorrow``/``tonight``/``noon``/
+``midnight``. Anything else (``look at the report``) stays in the reminder text.
+The due part is stored as text, exactly as typed.
 LocalMind does not schedule OS notifications -- it keeps a durable, local list
 you can review any time. This keeps the project dependency-free and offline.
 """
@@ -17,8 +22,18 @@ import re
 
 from . import Skill, SkillContext
 
-# Matches a trailing "... at 5pm" / "... by friday" / "... on monday" clause.
-_DUE_RE = re.compile(r"\b(?:at|by|on|due)\s+(.+)$", re.I)
+# Due-time forms accepted after at/by/on/due. Nothing else counts as a due time.
+_DUE_FORMS = (
+    r"\d{1,2}(?::\d\d)?\s*(?:am|pm)"  # 12-hour: 5pm, 10:30 am
+    r"|(?:[01]\d|2[0-3]):[0-5]\d"  # 24-hour HH:MM: 17:30
+    r"|\d{4}-\d{2}-\d{2}"  # YYYY-MM-DD
+    r"|monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+    r"|mon|tue|wed|thu|fri|sat|sun"
+    r"|today|tomorrow|tonight|noon|midnight"
+)
+# Matches a trailing "... at 5pm" / "... by friday" / "... on 2026-11-10" clause.
+# Anchored at the end, so with several at/by/on the last one is used.
+_DUE_RE = re.compile(rf"\b(?:at|by|on|due)\s+({_DUE_FORMS})\s*$", re.I)
 
 
 def _parse_reminder(text: str):
