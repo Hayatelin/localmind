@@ -15,6 +15,7 @@ database file and its schema) only on first use, so callers can simply do::
 from __future__ import annotations
 
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -37,23 +38,38 @@ class Storage:
         # The connection (and so the database file) is created on first
         # access to ``conn``; commands such as ``config`` never touch it.
         self._conn: Optional[sqlite3.Connection] = None
+        # Guards the first open so concurrent first accesses share one connection.
+        self._conn_lock = threading.Lock()
 
     @property
     def conn(self) -> sqlite3.Connection:
         """The SQLite connection, opened and initialised on first access."""
         if self._conn is None:
-            # ``check_same_thread=False`` keeps the simple CLI usable from tests;
-            # LocalMind never shares a connection across threads concurrently.
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            self._conn = conn
-            self._create_schema()
+            with self._conn_lock:
+                # Re-check under the lock: another thread may have opened it.
+                if self._conn is None:
+                    # ``check_same_thread=False`` keeps the simple CLI usable
+                    # from tests; LocalMind never shares a connection across
+                    # threads concurrently.
+                    conn = sqlite3.connect(self.db_path, check_same_thread=False)
+                    try:
+                        conn.row_factory = sqlite3.Row
+                        self._create_schema(conn)
+                    except BaseException:
+                        # Never keep a half-initialised connection: close it,
+                        # leave ``_conn`` as None and re-raise unchanged, so
+                        # the next access tries (and fails) again.
+                        conn.close()
+                        raise
+                    # Publish only a fully initialised connection.
+                    self._conn = conn
         return self._conn
 
     # -- lifecycle ---------------------------------------------------------
-    def _create_schema(self) -> None:
-        """Create all tables if they do not yet exist (idempotent)."""
-        self.conn.executescript(
+    @staticmethod
+    def _create_schema(conn: sqlite3.Connection) -> None:
+        """Create all tables on ``conn`` if they do not yet exist (idempotent)."""
+        conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS notes (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +94,7 @@ class Storage:
             );
             """
         )
-        self.conn.commit()
+        conn.commit()
 
     def close(self) -> None:
         """Close the connection, if one was opened. Safe to call repeatedly."""
