@@ -126,7 +126,8 @@ def _extract_expression(query: str) -> str:
     """Strip 'calc'/'what is' style prefixes and return the math expression."""
     text = query.strip()
     text = re.sub(
-        r"^\s*(calc(ulate)?|compute|what\s+is|eval(uate)?)\s*[:\-]?\s*",
+        # Only ":" is a separator; a "-" here is the expression's own minus sign.
+        r"^\s*(calc(ulate)?|compute|what\s+is|eval(uate)?)\s*:?\s*",
         "",
         text,
         flags=re.I,
