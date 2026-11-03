@@ -7,6 +7,11 @@ cannot run arbitrary code, import modules or access names.
 Supported: + - * / // % ** , parentheses, unary minus/plus and a handful of
 safe functions (abs, round, sqrt, min, max) plus the constants pi and e.
 
+Integer results are capped at ``_MAX_INT_BITS`` bits (about 3000 digits), and a
+power whose result would exceed that cap is rejected *before* it is computed, so
+an input such as ``9 ** 9 ** 9`` returns an error message immediately instead of
+hanging. Float overflow (e.g. ``10.0 ** 400``) is reported the same way.
+
 Examples that route here::
 
     calc 2 + 2 * 3
@@ -52,6 +57,38 @@ class _UnsafeExpression(ValueError):
     """Raised when an expression contains a disallowed construct."""
 
 
+class _TooLarge(ValueError):
+    """Raised when a result would exceed the size limits below."""
+
+
+#: Largest integer (in bits) any step may produce: about 3,000 decimal digits.
+_MAX_INT_BITS = 10_000
+
+
+def _check_size(value):
+    """Reject integer results above ``_MAX_INT_BITS``; pass others through."""
+    if isinstance(value, int) and value.bit_length() > _MAX_INT_BITS:
+        raise _TooLarge(f"result has more than {_MAX_INT_BITS} bits")
+    return value
+
+
+def _safe_pow(base, exponent):
+    """``base ** exponent`` that refuses integer powers above the size cap.
+
+    The size check happens before the power is computed, because CPython's
+    big-integer power cannot be interrupted once it starts.
+    """
+    if (
+        isinstance(base, int)
+        and isinstance(exponent, int)
+        and exponent > 0
+        and abs(base) > 1
+        and exponent * math.log2(abs(base)) > _MAX_INT_BITS
+    ):
+        raise _TooLarge(f"result would have more than {_MAX_INT_BITS} bits")
+    return base ** exponent
+
+
 def _evaluate(node: ast.AST) -> float:
     """Recursively evaluate an allow-listed AST node, else raise."""
     if isinstance(node, ast.Expression):
@@ -61,7 +98,10 @@ def _evaluate(node: ast.AST) -> float:
             return node.value
         raise _UnsafeExpression("only numeric literals are allowed")
     if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
-        return _BIN_OPS[type(node.op)](_evaluate(node.left), _evaluate(node.right))
+        left, right = _evaluate(node.left), _evaluate(node.right)
+        if isinstance(node.op, ast.Pow):
+            return _check_size(_safe_pow(left, right))
+        return _check_size(_BIN_OPS[type(node.op)](left, right))
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
         return _UNARY_OPS[type(node.op)](_evaluate(node.operand))
     if isinstance(node, ast.Name) and node.id in _CONSTANTS:
@@ -72,7 +112,7 @@ def _evaluate(node: ast.AST) -> float:
             raise _UnsafeExpression(f"function '{node.func.id}' is not allowed")
         if node.keywords:
             raise _UnsafeExpression("keyword arguments are not allowed")
-        return fn(*[_evaluate(arg) for arg in node.args])
+        return _check_size(fn(*[_evaluate(arg) for arg in node.args]))
     raise _UnsafeExpression("unsupported expression")
 
 
@@ -103,6 +143,10 @@ def run(query: str, context: SkillContext) -> str:
         result = safe_eval(expression)
     except _UnsafeExpression as exc:
         return f"I can only do safe arithmetic: {exc}."
+    except _TooLarge as exc:
+        return f"That number is too large to calculate: {exc}."
+    except OverflowError:
+        return f"Could not evaluate '{expression}': the result is too large."
     except (SyntaxError, ZeroDivisionError, ValueError, TypeError) as exc:
         return f"Could not evaluate '{expression}': {exc}."
     # Present whole-number floats without a trailing ".0".
