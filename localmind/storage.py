@@ -15,6 +15,7 @@ database file and its schema) only on first use, so callers can simply do::
 from __future__ import annotations
 
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -37,17 +38,23 @@ class Storage:
         # The connection (and so the database file) is created on first
         # access to ``conn``; commands such as ``config`` never touch it.
         self._conn: Optional[sqlite3.Connection] = None
+        # Guards the first open so concurrent first accesses share one connection.
+        self._conn_lock = threading.Lock()
 
     @property
     def conn(self) -> sqlite3.Connection:
         """The SQLite connection, opened and initialised on first access."""
         if self._conn is None:
-            # ``check_same_thread=False`` keeps the simple CLI usable from tests;
-            # LocalMind never shares a connection across threads concurrently.
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            self._conn = conn
-            self._create_schema()
+            with self._conn_lock:
+                # Re-check under the lock: another thread may have opened it.
+                if self._conn is None:
+                    # ``check_same_thread=False`` keeps the simple CLI usable
+                    # from tests; LocalMind never shares a connection across
+                    # threads concurrently.
+                    conn = sqlite3.connect(self.db_path, check_same_thread=False)
+                    conn.row_factory = sqlite3.Row
+                    self._conn = conn
+                    self._create_schema()
         return self._conn
 
     # -- lifecycle ---------------------------------------------------------
