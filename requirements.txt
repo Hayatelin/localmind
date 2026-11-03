@@ -4,4 +4,4 @@ PyYAML>=6.0
 # Optional: only needed if you point LocalMind at a local OpenAI-compatible
 # endpoint (provider: local, e.g. Ollama / LM Studio). Imported lazily, so the
 # offline mock provider works without it. Uncomment to install:
-# requests>=2.28
+# requests>=2.32.4
