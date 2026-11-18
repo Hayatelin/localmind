@@ -97,10 +97,15 @@ class Storage:
         conn.commit()
 
     def close(self) -> None:
-        """Close the connection, if one was opened. Safe to call repeatedly."""
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+        """Close the connection, if one was opened. Safe to call repeatedly.
+
+        Takes the same lock as the first open in ``conn``, so a close cannot
+        interleave with another thread publishing a new connection.
+        """
+        with self._conn_lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None
 
     # -- context manager support ------------------------------------------
     def __enter__(self) -> "Storage":

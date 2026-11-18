@@ -61,8 +61,15 @@ class _TooLarge(ValueError):
     """Raised when a result would exceed the size limits below."""
 
 
+class _TooLong(ValueError):
+    """Raised when an expression is too long or too deeply nested to evaluate."""
+
+
 #: Largest integer (in bits) any step may produce: about 3,000 decimal digits.
 _MAX_INT_BITS = 10_000
+
+#: Longest expression (in characters) handed to the parser.
+_MAX_EXPRESSION_CHARS = 10_000
 
 
 def _check_size(value):
@@ -117,9 +124,22 @@ def _evaluate(node: ast.AST) -> float:
 
 
 def safe_eval(expression: str) -> float:
-    """Parse and evaluate ``expression`` safely; raise on anything disallowed."""
-    tree = ast.parse(expression, mode="eval")
-    return _evaluate(tree)
+    """Parse and evaluate ``expression`` safely; raise on anything disallowed.
+
+    Inputs longer than ``_MAX_EXPRESSION_CHARS`` are rejected before parsing:
+    on some Python versions ``ast.parse`` crashes the interpreter on very long
+    inputs (for example 300,000 terms on 3.9). Shorter inputs can still nest
+    too deeply, e.g. ``1 + 1 + ... + 1`` with about 1,000 terms (recursion
+    limit) or about 6,000 leading minus signs (parser stack, ``MemoryError``);
+    both are reported as ``_TooLong`` instead of leaking the exception.
+    """
+    if len(expression) > _MAX_EXPRESSION_CHARS:
+        raise _TooLong(f"it is longer than {_MAX_EXPRESSION_CHARS} characters")
+    try:
+        tree = ast.parse(expression, mode="eval")
+        return _evaluate(tree)
+    except (RecursionError, MemoryError):
+        raise _TooLong("it has too many terms or too much nesting") from None
 
 
 def _extract_expression(query: str) -> str:
@@ -146,6 +166,8 @@ def run(query: str, context: SkillContext) -> str:
         return f"I can only do safe arithmetic: {exc}."
     except _TooLarge as exc:
         return f"That number is too large to calculate: {exc}."
+    except _TooLong as exc:
+        return f"That expression is too long to calculate: {exc}."
     except OverflowError:
         return f"Could not evaluate '{expression}': the result is too large."
     except (SyntaxError, ZeroDivisionError, ValueError, TypeError) as exc:
